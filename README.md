@@ -1,48 +1,68 @@
-SQL Server → Debezium → Kafka CDC Pipeline
+# SQL Server → Debezium → Kafka CDC Pipeline
 
-This project implements a real-time Change Data Capture (CDC) pipeline that streams INSERT, UPDATE, and DELETE events from Microsoft SQL Server to Apache Kafka using Debezium and Kafka Connect. Docker is used to build a reproducible local streaming environment with a Kafka UI for monitoring.
+This project implements a real-time Change Data Capture (CDC) pipeline
+that streams **INSERT**, **UPDATE**, and **DELETE** events from
+**Microsoft SQL Server** to **Apache Kafka** using **Debezium** and
+**Kafka Connect**. Docker is used to build a reproducible local
+streaming environment with a Kafka UI for monitoring.
 
-Objective
 
-Enable SQL Server CDC and build a production-style streaming pipeline that captures database changes and publishes them to Kafka topics in real time. This simulates enterprise-grade data integration for event-driven systems, analytics pipelines, and microservices communication.
+## Objective
 
-Architecture
-SQL Server (CDC Enabled)
-        ↓
-Debezium (Kafka Connect)
-        ↓
-Kafka Topics
-        ↓
-Kafka UI / Stream Consumers
+Enable SQL Server CDC and build a production-style streaming pipeline
+that captures database changes and publishes them to Kafka topics in
+real time.
 
-Requirements
+This simulates enterprise-grade data integration for:
 
-Docker & Docker Compose
+-   Event-driven systems\
+-   Analytics pipelines\
+-   Microservices communication
 
-SQL Server (local or network)
 
-Required ports:
+## Architecture
 
-1433 – SQL Server
+    SQL Server (CDC Enabled)
+            ↓
+    Debezium (Kafka Connect)
+            ↓
+    Kafka Topics
+            ↓
+    Kafka UI / Stream Consumers
 
-9092 / 29092 – Kafka
 
-2181 – Zookeeper
+## Requirements
 
-7083 – Kafka Connect API
+-   Docker & Docker Compose
+-   SQL Server
 
-8081 – Kafka UI
+### Required Ports
 
-SQL Server Setup
-Enable CDC at DB level
+  Service         Port
+  --------------- --------------
+  SQL Server      1433
+  Kafka           9092 / 29092
+  Zookeeper       2181
+  Kafka Connect   7083
+  Kafka UI        8081
+
+
+## SQL Server Setup
+
+### Enable CDC at DB level
+
+``` sql
 IF DB_ID('DemoDB') IS NULL
   CREATE DATABASE DemoDB;
 GO
 
 USE DemoDB;
 EXEC sys.sp_cdc_enable_db;
+```
 
-Create table & enable CDC
+### Create table & enable CDC
+
+``` sql
 CREATE TABLE dbo.Customers(
   Id INT IDENTITY PRIMARY KEY,
   Name NVARCHAR(100) NOT NULL,
@@ -55,39 +75,40 @@ EXEC sys.sp_cdc_enable_table
   @source_schema = 'dbo',
   @source_name = 'Customers',
   @supports_net_changes = 1;
+```
 
+### Test insert
 
-Test insert:
-
+``` sql
 INSERT INTO dbo.Customers(Name, Email) VALUES ('Test2', 'Test2@example.com');
+```
 
-Docker Environment
 
-A multi-container environment is deployed using Docker Compose, including:
+## Docker Environment
 
-Zookeeper
+The following services run in Docker:
 
-Kafka broker
+-   Zookeeper
+-   Kafka Broker
+-   Kafka Connect (Debezium)
+-   Kafka UI
 
-Kafka Connect (Debezium)
+Run:
 
-Kafka UI
-
-Start services:
-
+``` bash
 docker-compose up -d
-
-Debezium Connector Setup
-
-Create connector via Kafka Connect REST API:
-
-curl -X POST http://localhost:7083/connectors \
--H "Content-Type: application/json" \
--d @connector.json
+```
 
 
-connector.json
+## Debezium Connector Setup
 
+``` bash
+curl -X POST http://localhost:7083/connectors -H "Content-Type: application/json" -d @connector.json
+```
+
+### `connector.json`
+
+``` json
 {
   "name": "sql-server-cdc-connector",
   "config": {
@@ -102,18 +123,20 @@ connector.json
     "snapshot.mode": "initial"
   }
 }
-
-Verifying CDC Events
-
-Kafka UI:
-
-http://localhost:8081
+```
 
 
-Topic example:
-DESKTOP-TTTT.dbo.Customers
+## Verifying CDC Events
 
-Sample event
+Open Kafka UI:\
+`http://localhost:8081`
+
+Topic:\
+`DESKTOP-TTTT.dbo.Customers`
+
+### Sample event
+
+``` json
 {
   "op": "c",
   "after": {
@@ -122,57 +145,31 @@ Sample event
     "Email": "Test2@example.com"
   }
 }
+```
 
-op	Meaning
-c	Create
-u	Update
-d	Delete
-Cleanup (optional)
-EXEC sys.sp_cdc_cleanup_change_table 
-  @capture_instance = 'dbo_Customers',
-  @low_water_mark = NULL;
+  op    Meaning
+  ----- ---------
+  `c`   Create
+  `u`   Update
+  `d`   Delete
 
-Results
 
-The pipeline successfully:
 
-Captures SQL Server changes using CDC
 
-Streams events to Kafka topics via Debezium
+## Future Improvements
 
-Displays them in Kafka UI in real time
+-   Kafka → PostgreSQL sink connector
+-   Kafka Streams / Flink
+-   Prometheus & Grafana monitoring
+-   Kubernetes deployment
+-   S3 / Delta Lake / Iceberg integration
 
-Supports snapshot and incremental streaming
+## Repository Structure
 
-Key Learnings
-
-SQL Server CDC internals
-
-Debezium connector configuration
-
-Kafka Connect operations
-
-Real-time streaming architecture
-
-Docker-based data pipeline deployment
-
-Future Improvements
-
-Kafka → PostgreSQL sink connector
-
-Kafka Streams / Flink data processing
-
-Monitoring with Prometheus & Grafana
-
-Kubernetes deployment
-
-Data Lake integration (S3 / Delta Lake / Iceberg)
-
-Repository Structure
-/cdc-sqlserver-kafka/
- ├─ docker-compose.yml
- ├─ connector.json
- ├─ sql/
- │   └─ mssql_cdc_setup.sql
- ├─ screenshots/
- └─ README.md
+    /cdc-sqlserver-kafka/
+     ├─ docker-compose.yml
+     ├─ connector.json
+     ├─ sql/
+     │   └─ mssql_cdc_setup.sql
+     ├─ screenshots/
+     └─ README.md
